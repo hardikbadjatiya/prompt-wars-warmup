@@ -91,10 +91,29 @@ Respond ONLY in JSON: {"message": "your message here", "type": "info|warning|ale
 export async function analyzeCover(position: Position) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const prompt = `You are a tactical terrain AI for a GPS-based game.
+    // contextual data (simulated for now, would come from map service in full prod)
+    const context = {
+        buildings: "Urban low-density residential, scattered structures",
+        openAreas: "Small parks and street intersections nearby",
+        speed: "Walking (avg 1.4m/s)",
+        density: "Medium-Low"
+    };
 
-Analyze the likely terrain and cover at coordinates (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)}).
-Based on typical urban/suburban geography, estimate the cover level.
+    const prompt = `You are a tactical AI assistant in an area control map game.
+
+Given this zone context:
+- Nearby buildings: ${context.buildings}
+- Nearby parks/open spaces: ${context.openAreas}
+- Player movement speed: ${context.speed}
+- Zone density score: ${context.density}
+- Coordinates: (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})
+
+Classify this zone as:
+1. High Cover (safe)
+2. Medium Cover
+3. Low Cover (exposed)
+
+Also generate a tactical suggestion for capturing nearby zones.
 
 Respond ONLY in JSON:
 {

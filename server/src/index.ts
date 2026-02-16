@@ -1,12 +1,37 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import geminiRoutes from './routes/gemini.js';
 import zonesRoutes from './routes/zones.js';
 import { authMiddleware } from './middleware/auth.js';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
+
+// Security Middleware
+app.set('trust proxy', 1); // Trust first proxy (Cloud Run load balancer)
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com"],
+            imgSrc: ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://lh3.googleusercontent.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
+            connectSrc: ["'self'", "https://maps.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"],
+        },
+    },
+}));
+
+app.use(rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    limit: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again later.',
+}));
 
 // Middleware
 app.use(cors({

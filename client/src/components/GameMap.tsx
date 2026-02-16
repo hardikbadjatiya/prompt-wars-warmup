@@ -19,7 +19,7 @@ interface GameMapProps {
     currentZone: Zone | null;
 }
 
-export const GameMap: React.FC<GameMapProps> = ({
+export const GameMap: React.FC<GameMapProps> = React.memo(({
     playerPos,
     zones,
     playerId,
@@ -215,4 +215,4 @@ export const GameMap: React.FC<GameMapProps> = ({
             )}
         </div>
     );
-};
+});

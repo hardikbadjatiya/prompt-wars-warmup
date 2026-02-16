@@ -8,7 +8,7 @@ interface MissionPanelProps {
     loading: boolean;
 }
 
-export const MissionPanel: React.FC<MissionPanelProps> = ({ missions, isOpen, onToggle, loading }) => {
+export const MissionPanel: React.FC<MissionPanelProps> = React.memo(({ missions, isOpen, onToggle, loading }) => {
     const missionTypeIcon: Record<string, string> = {
         capture: '🎯',
         strategic: '♟️',
@@ -117,4 +117,4 @@ export const MissionPanel: React.FC<MissionPanelProps> = ({ missions, isOpen, on
             </div>
         </div>
     );
-};
+});
