@@ -12,9 +12,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     const authHeader = req.headers.authorization;
 
     if (!authHeader?.startsWith('Bearer ')) {
-        // In development mode, allow unauthenticated requests
+        // In development mode, allow unauthenticated requests with demo user
         if (process.env.NODE_ENV === 'development') {
-            (req as any).uid = 'dev-user';
+            (req as any).user = { uid: 'dev-user', email: 'dev@example.com' };
             next();
             return;
         }
@@ -24,9 +24,20 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
     const token = authHeader.split('Bearer ')[1];
 
+    // Allow demo token for testing
+    if (token === 'demo-token') {
+        (req as any).user = { uid: 'demo-user', email: 'demo@example.com' };
+        next();
+        return;
+    }
+
     try {
         const decoded = await admin.auth().verifyIdToken(token);
-        (req as any).uid = decoded.uid;
+        (req as any).user = {
+            uid: decoded.uid,
+            email: decoded.email,
+            displayName: decoded.name,
+        };
         next();
     } catch (error) {
         console.error('Auth verification error:', error);
