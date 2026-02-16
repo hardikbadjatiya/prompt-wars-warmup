@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut, type User } from 'firebase/auth';
 import { auth, googleProvider } from '../services/firebase';
 
 interface AuthState {
@@ -18,6 +18,19 @@ export function useAuth() {
     });
 
     useEffect(() => {
+        // Check for redirect result first
+        getRedirectResult(auth)
+            .then(async (result) => {
+                if (result?.user) {
+                    const token = await result.user.getIdToken();
+                    setState({ user: result.user, token, loading: false, error: null });
+                }
+            })
+            .catch((err) => {
+                console.error('Redirect error:', err);
+                setState(prev => ({ ...prev, loading: false, error: err.message }));
+            });
+
         const unsub = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 const token = await user.getIdToken();
@@ -32,7 +45,8 @@ export function useAuth() {
     const login = useCallback(async () => {
         try {
             setState(prev => ({ ...prev, loading: true, error: null }));
-            await signInWithPopup(auth, googleProvider);
+            // Use redirect instead of popup - works without authorized domain
+            await signInWithRedirect(auth, googleProvider);
         } catch (err) {
             setState(prev => ({
                 ...prev,
