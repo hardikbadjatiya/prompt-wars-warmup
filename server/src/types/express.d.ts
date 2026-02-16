@@ -1,16 +1,19 @@
 /**
  * Type definitions for authenticated requests
+ * This extends the Express Request interface globally
  */
 
-import { Request } from 'express';
-
-/**
- * Extended Request interface with authenticated user data
- */
-export interface AuthenticatedRequest extends Request {
-    user?: {
-        uid: string;
-        email?: string;
-        displayName?: string;
-    };
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                uid: string;
+                email?: string;
+                displayName?: string;
+            };
+        }
+    }
 }
+
+export { };
+
