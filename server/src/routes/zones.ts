@@ -1,52 +1,187 @@
-import { Router, type Request, type Response } from 'express';
+import express from 'express';
+import {
+    captureZone,
+    getAllZones,
+    getUserZonesLast7Days,
+    getLeaderboard,
+    reinforceZone,
+    updateUserProfile,
+} from '../services/firestoreService.js';
+import { analyzeLeaderboard } from '../services/geminiService.js';
 
-const router = Router();
+const router = express.Router();
 
-// In-memory zone store (in production, use Firestore)
-const zoneStore = new Map<string, {
-    id: string;
-    owner: string | null;
-    ownerName: string | null;
-    hp: number;
-    capturedAt: number | null;
-    coverRating: string;
-}>();
-
-router.get('/:areaId', (req: Request, res: Response) => {
-    const areaId = req.params.areaId as string;
-    const zones = Array.from(zoneStore.values()).filter(z => z.id.startsWith(areaId));
-    res.json({ zones });
-});
-
-router.post('/capture', (req: Request, res: Response) => {
+/**
+ * POST /api/zones/capture
+ * Captures a zone for the authenticated user
+ */
+router.post('/capture', async (req, res) => {
     try {
-        const { zoneId, playerId, playerName } = req.body;
+        const { zoneId, position, coverRating, displayName } = req.body;
+        const userId = req.user?.uid;
 
-        if (!zoneId || !playerId) {
-            res.status(400).json({ error: 'zoneId and playerId are required' });
-            return;
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        const zone = zoneStore.get(zoneId) || {
-            id: zoneId,
-            owner: null,
-            ownerName: null,
-            hp: 0,
-            capturedAt: null,
-            coverRating: 'unknown',
-        };
+        if (!zoneId || !position || !displayName) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
 
-        zone.owner = playerId;
-        zone.ownerName = playerName || 'Unknown';
-        zone.hp = 100;
-        zone.capturedAt = Date.now();
+        // Validate position
+        if (typeof position.lat !== 'number' || typeof position.lng !== 'number') {
+            return res.status(400).json({ error: 'Invalid position coordinates' });
+        }
 
-        zoneStore.set(zoneId, zone);
+        // Capture the zone in Firestore
+        await captureZone(zoneId, userId, {
+            displayName,
+            position,
+            coverRating: coverRating || 'medium',
+        });
 
-        res.json({ success: true, zone });
+        // Update user profile
+        await updateUserProfile(userId, {
+            displayName,
+            photoURL: null,
+            lastActive: Date.now(),
+        });
+
+        res.json({
+            success: true,
+            zoneId,
+            message: 'Zone captured successfully',
+        });
     } catch (error) {
         console.error('Zone capture error:', error);
         res.status(500).json({ error: 'Failed to capture zone' });
+    }
+});
+
+/**
+ * POST /api/zones/reinforce
+ * Reinforces a zone (restores HP to 100)
+ */
+router.post('/reinforce', async (req, res) => {
+    try {
+        const { zoneId } = req.body;
+        const userId = req.user?.uid;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        if (!zoneId) {
+            return res.status(400).json({ error: 'Missing zone ID' });
+        }
+
+        await reinforceZone(zoneId, userId);
+
+        res.json({
+            success: true,
+            zoneId,
+            message: 'Zone reinforced successfully',
+        });
+    } catch (error: any) {
+        console.error('Zone reinforce error:', error);
+        res.status(error.message === 'You can only reinforce your own zones' ? 403 : 500)
+            .json({ error: error.message || 'Failed to reinforce zone' });
+    }
+});
+
+/**
+ * GET /api/zones/all
+ * Gets all zones with their current owners
+ */
+router.get('/all', async (req, res) => {
+    try {
+        const zones = await getAllZones();
+        res.json({ zones });
+    } catch (error) {
+        console.error('Get zones error:', error);
+        res.status(500).json({ error: 'Failed to fetch zones' });
+    }
+});
+
+/**
+ * GET /api/zones/my-history
+ * Gets user's zone captures from the last 7 days
+ */
+router.get('/my-history', async (req, res) => {
+    try {
+        const userId = req.user?.uid;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const history = await getUserZonesLast7Days(userId);
+        res.json({ history });
+    } catch (error) {
+        console.error('Get history error:', error);
+        res.status(500).json({ error: 'Failed to fetch history' });
+    }
+});
+
+/**
+ * GET /api/zones/leaderboard
+ * Gets the top players leaderboard
+ */
+router.get('/leaderboard', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit as string) || 10;
+        const leaderboard = await getLeaderboard(limit);
+        res.json({ leaderboard });
+    } catch (error) {
+        console.error('Get leaderboard error:', error);
+        res.status(500).json({ error: 'Failed to fetch leaderboard' });
+    }
+});
+
+/**
+ * POST /api/zones/leaderboard-analysis
+ * Uses Gemini AI to analyze leaderboard and provide strategic insights
+ */
+router.post('/leaderboard-analysis', async (req, res) => {
+    try {
+        const userId = req.user?.uid;
+
+        if (!userId) {
+            return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        // Get leaderboard data
+        const leaderboard = await getLeaderboard(20);
+
+        // Find current user's stats
+        const currentUserIndex = leaderboard.findIndex(p => p.uid === userId);
+        const currentUser = currentUserIndex >= 0
+            ? leaderboard[currentUserIndex]
+            : { uid: userId, totalCaptures: 0, rank: leaderboard.length + 1 };
+
+        // Use Gemini AI to analyze patterns
+        const analysis = await analyzeLeaderboard(leaderboard, {
+            uid: currentUser.uid,
+            totalCaptures: currentUser.totalCaptures,
+            rank: currentUser.rank,
+        });
+
+        res.json({
+            analysis,
+            leaderboard: leaderboard.slice(0, 10), // Top 10
+            yourRank: currentUser.rank,
+            yourCaptures: currentUser.totalCaptures,
+        });
+    } catch (error) {
+        console.error('Leaderboard analysis error:', error);
+        res.status(500).json({
+            error: 'Failed to analyze leaderboard',
+            fallback: {
+                topStrategy: "Capture zones consistently",
+                personalAdvice: "Focus on maintaining active zones",
+                insights: ["Consistency is key", "Reinforce regularly", "Choose strategic locations"]
+            }
+        });
     }
 });
 

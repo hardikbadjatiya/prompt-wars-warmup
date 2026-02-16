@@ -1,10 +1,11 @@
 /**
  * Gemini AI Service - Core AI integration for Area Control Loop
  * 
- * This service provides three main AI-powered features:
+ * This service provides four main AI-powered features:
  * 1. Mission Generation - Context-aware objectives based on player location
  * 2. Cover Analysis - Tactical terrain evaluation for zone safety
  * 3. Commentary - Real-time strategic advice and tips
+ * 4. Leaderboard Analysis - AI-powered strategy recommendations
  * 
  * All functions use Gemini 2.0 Flash for fast, cost-effective inference
  * with structured JSON output for type-safe parsing.
@@ -27,6 +28,14 @@ interface ZoneContext {
 interface Position {
     lat: number;
     lng: number;
+}
+
+interface LeaderboardEntry {
+    uid: string;
+    displayName: string;
+    totalCaptures: number;
+    lastActive: number;
+    rank: number;
 }
 
 /**
@@ -83,10 +92,22 @@ Make missions that feel tactical and strategic. Use military/game terminology.`;
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
-    // Extract JSON from response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
-        throw new Error('Could not parse Gemini response');
+        return {
+            missions: [
+                {
+                    id: 'fallback-1',
+                    title: 'Territory Expansion',
+                    description: 'Capture nearby neutral zones',
+                    type: 'capture',
+                    objectives: [{ description: 'Capture zones', target: 2, current: 0, completed: false }],
+                    reward: 20,
+                    expiresAt: Date.now() + 600000,
+                    completed: false,
+                },
+            ],
+        };
     }
 
     return JSON.parse(jsonMatch[0]);
@@ -121,23 +142,28 @@ export async function generateCommentary(
 ) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const prompt = `You are a tactical AI companion for a GPS territory control game.
+    const enemyZones = nearbyZones.filter(z => z.owner && z.owner !== currentZone?.owner).length;
+    const neutralZones = nearbyZones.filter(z => !z.owner).length;
 
-Player position: (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})
-Current zone: ${currentZone ? JSON.stringify(currentZone) : 'none (in transit)'}
-Nearby zones: ${JSON.stringify(nearbyZones.slice(0, 6))}
+    const prompt = `You are a tactical AI assistant in a GPS territory control game.
 
-Generate ONE short tactical commentary message (max 120 characters) about the player's current situation.
-Be dramatic, military-style, and game-like. Comment on zone control, strategic opportunities, or dangers.
+Player status:
+- Position: (${position.lat.toFixed(5)}, ${position.lng.toFixed(5)})
+- Current zone: ${currentZone ? `Owned by ${currentZone.owner}, HP: ${currentZone.hp}%` : 'None (moving)'}
+- Nearby: ${enemyZones} enemy zones, ${neutralZones} neutral zones
 
-Respond ONLY in JSON: {"message": "your message here", "type": "info|warning|alert|success"}`;
+Generate a brief tactical comment (1 sentence, max 15 words). Respond ONLY in JSON:
+{
+  "message": "Your tactical comment here",
+  "type": "info|warning|success"
+}`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
     const jsonMatch = text.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
-        return { message: 'Scanning area... standby for intel.', type: 'info' };
+        return { message: 'Area scanned. Continue mission.', type: 'info' };
     }
 
     return JSON.parse(jsonMatch[0]);
@@ -213,3 +239,71 @@ Respond ONLY in JSON:
     return JSON.parse(jsonMatch[0]);
 }
 
+/**
+ * Analyzes leaderboard data and provides strategic insights
+ * 
+ * This is the 4th Gemini use case - analyzing player performance patterns
+ * to recommend optimal strategies for climbing the leaderboard.
+ * 
+ * @param leaderboardData - Top players with their stats
+ * @param currentUser - Current user's stats
+ * @returns Promise<{topStrategy: string, personalAdvice: string, insights: string[]}>
+ * 
+ * @example
+ * const analysis = await analyzeLeaderboard(topPlayers, myStats);
+ * console.log(analysis.topStrategy); // "Focus on high-cover zones in dense areas"
+ */
+export async function analyzeLeaderboard(
+    leaderboardData: LeaderboardEntry[],
+    currentUser: { uid: string; totalCaptures: number; rank: number }
+) {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    const topPlayer = leaderboardData[0];
+    const avgCaptures = leaderboardData.reduce((sum, p) => sum + p.totalCaptures, 0) / leaderboardData.length;
+
+    const prompt = `You are a competitive strategy AI for a GPS territory control game.
+
+Leaderboard Analysis:
+- Top player: ${topPlayer?.displayName} with ${topPlayer?.totalCaptures} captures
+- Average captures (top 10): ${Math.round(avgCaptures)}
+- Current player: Rank #${currentUser.rank}, ${currentUser.totalCaptures} captures
+- Gap to #1: ${(topPlayer?.totalCaptures || 0) - currentUser.totalCaptures} captures
+
+Player activity data:
+${JSON.stringify(leaderboardData.slice(0, 5).map(p => ({
+        name: p.displayName,
+        captures: p.totalCaptures,
+        lastActive: new Date(p.lastActive).toISOString(),
+    })))}
+
+Analyze the data and provide:
+1. The most effective strategy used by top players
+2. Personalized advice for the current player to improve rank
+3. 3 key insights about winning patterns
+
+Respond ONLY in JSON:
+{
+  "topStrategy": "1-sentence description of what top players do",
+  "personalAdvice": "1-sentence specific advice for current player",
+  "insights": ["insight 1", "insight 2", "insight 3"]
+}`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+
+    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    if (!jsonMatch) {
+        return {
+            topStrategy: "Capture zones consistently and reinforce them regularly",
+            personalAdvice: "Focus on capturing more zones to climb the leaderboard",
+            insights: [
+                "Top players maintain active zones",
+                "Consistency beats sporadic activity",
+                "High-cover zones are easier to defend"
+            ]
+        };
+    }
+
+    return JSON.parse(jsonMatch[0]);
+}
