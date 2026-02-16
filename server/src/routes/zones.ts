@@ -24,20 +24,53 @@ router.post('/capture', async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
+        // Comprehensive input validation
         if (!zoneId || !position || !displayName) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        // Validate position
+        // Validate zone ID format (alphanumeric + underscore only)
+        if (!/^[a-zA-Z0-9_-]{1,100}$/.test(zoneId)) {
+            return res.status(400).json({ error: 'Invalid zone ID format' });
+        }
+
+        // Validate displayName (max 50 chars, no special chars)
+        if (typeof displayName !== 'string' || displayName.length > 50 || displayName.length < 1) {
+            return res.status(400).json({ error: 'Invalid display name' });
+        }
+
+        // Sanitize displayName (remove HTML/script tags)
+        const sanitizedName = displayName.replace(/<[^>]*>/g, '').trim();
+
+        // Validate position coordinates
         if (typeof position.lat !== 'number' || typeof position.lng !== 'number') {
             return res.status(400).json({ error: 'Invalid position coordinates' });
         }
 
+        // Validate GPS bounds (latitude: -90 to 90, longitude: -180 to 180)
+        if (position.lat < -90 || position.lat > 90 || position.lng < -180 || position.lng > 180) {
+            return res.status(400).json({ error: 'Position coordinates out of bounds' });
+        }
+
+        // Validate coverRating
+        const validRatings = ['high', 'medium', 'low'];
+        const rating = coverRating || 'medium';
+        if (!validRatings.includes(rating)) {
+            return res.status(400).json({ error: 'Invalid cover rating' });
+        }
+
         // Capture the zone in Firestore
         await captureZone(zoneId, userId, {
-            displayName,
+            displayName: sanitizedName,
             position,
-            coverRating: coverRating || 'medium',
+            coverRating: rating,
+        });
+
+        // Update user profile
+        await updateUserProfile(userId, {
+            displayName: sanitizedName,
+            photoURL: null,
+            lastActive: Date.now(),
         });
 
         // Update user profile
