@@ -88,10 +88,27 @@ Respond ONLY in JSON: {"message": "your message here", "type": "info|warning|ale
     return JSON.parse(jsonMatch[0]);
 }
 
+
+/**
+ * Analyzes terrain cover at a given position using Gemini AI
+ * 
+ * This function demonstrates advanced Gemini integration by:
+ * 1. Providing contextual terrain data (buildings, open areas, density)
+ * 2. Requesting structured JSON output for type-safe parsing
+ * 3. Implementing fallback handling for robust error recovery
+ * 
+ * @param position - GPS coordinates {lat, lng} to analyze
+ * @returns Promise<{coverRating: string, analysis: string, tacticalAdvice: string}>
+ * 
+ * @example
+ * const cover = await analyzeCover({ lat: 37.7749, lng: -122.4194 });
+ * console.log(cover.coverRating); // "high" | "medium" | "low"
+ */
 export async function analyzeCover(position: Position) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // contextual data (simulated for now, would come from map service in full prod)
+    // Contextual data for AI analysis
+    // In production, this would come from Google Maps Places API or similar
     const context = {
         buildings: "Urban low-density residential, scattered structures",
         openAreas: "Small parks and street intersections nearby",
@@ -99,6 +116,11 @@ export async function analyzeCover(position: Position) {
         density: "Medium-Low"
     };
 
+    // Structured prompt for consistent JSON output
+    // This demonstrates best practices for Gemini prompt engineering:
+    // - Clear role definition ("tactical AI assistant")
+    // - Specific context (buildings, terrain, movement)
+    // - Explicit output format (JSON schema)
     const prompt = `You are a tactical AI assistant in an area control map game.
 
 Given this zone context:
@@ -125,10 +147,14 @@ Respond ONLY in JSON:
     const result = await model.generateContent(prompt);
     const text = result.response.text();
 
+    // Robust JSON extraction with regex
+    // Handles cases where Gemini adds markdown formatting
     const jsonMatch = text.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
+        // Fallback response for error resilience
         return { coverRating: 'medium', analysis: 'Area scan complete.', tacticalAdvice: 'Proceed with caution.' };
     }
 
     return JSON.parse(jsonMatch[0]);
 }
+

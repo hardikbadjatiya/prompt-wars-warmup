@@ -24,7 +24,7 @@ if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q
 fi
 
 # Set project
-gcloud config set project "$PROJECT_ID"
+gcloud config set project "$PROJECT_ID" -q
 
 # Enable required services
 echo "📦 Enabling required APIs..."
@@ -37,22 +37,10 @@ else
     echo "⚠️ Warning: .env file not found. Using default/empty env vars."
 fi
 
-# Build and Deploy
-echo "🔨 Building container image..."
-gcloud builds submit --tag gcr.io/"$PROJECT_ID"/"$SERVICE_NAME" \
-  --substitutions="_VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY},_VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN},_VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID},_VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET},_VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID},_VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID},_VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY},_VITE_API_URL=${VITE_API_URL}"
+# Build and Deploy using Cloud Build config
+echo "🔨 Building and Deploying with Cloud Build..."
+gcloud builds submit --config cloudbuild.yaml \
+  --substitutions="_VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY},_VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN},_VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID},_VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET},_VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID},_VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID},_VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY},_VITE_API_URL=${VITE_API_URL},_REGION=${REGION},_GEMINI_API_KEY=${GEMINI_API_KEY},_FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID},_CORS_ORIGIN=${CORS_ORIGIN}"
 
-echo "🚀 Deploying to Cloud Run..."
-gcloud run deploy "$SERVICE_NAME" \
-  --image gcr.io/"$PROJECT_ID"/"$SERVICE_NAME" \
-  --platform managed \
-  --region "$REGION" \
-  --allow-unauthenticated \
-  --set-env-vars "NODE_ENV=production" \
-  --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY}" \
-  --set-env-vars "FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}" \
-  --set-env-vars "CORS_ORIGIN=${CORS_ORIGIN}" \
-  --port 8080
-
-echo "✅ App deployed successfully!"
-echo "   URL: $(gcloud run services describe "$SERVICE_NAME" --platform managed --region "$REGION" --format 'value(status.url)')"
+echo "✅ App deployment triggered!"
+echo "   Monitor build progress in the console output above."

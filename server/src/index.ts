@@ -16,11 +16,12 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://maps.googleapis.com", "https://apis.google.com", "https://accounts.google.com"],
             imgSrc: ["'self'", "data:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://lh3.googleusercontent.com"],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            connectSrc: ["'self'", "https://maps.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"],
+            connectSrc: ["'self'", "https://maps.googleapis.com", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://accounts.google.com"],
+            frameSrc: ["'self'", "https://accounts.google.com", "https://area-control-game.firebaseapp.com"],
         },
     },
 }));
