@@ -1,5 +1,19 @@
+/**
+ * Gemini AI Service - Core AI integration for Area Control Loop
+ * 
+ * This service provides three main AI-powered features:
+ * 1. Mission Generation - Context-aware objectives based on player location
+ * 2. Cover Analysis - Tactical terrain evaluation for zone safety
+ * 3. Commentary - Real-time strategic advice and tips
+ * 
+ * All functions use Gemini 2.0 Flash for fast, cost-effective inference
+ * with structured JSON output for type-safe parsing.
+ */
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Initialize Gemini AI with API key from environment
+// API key is kept server-side only for security
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 interface ZoneContext {
@@ -15,6 +29,25 @@ interface Position {
     lng: number;
 }
 
+/**
+ * Generates adaptive missions based on player location and nearby zones
+ * 
+ * This demonstrates advanced Gemini integration:
+ * - Contextual awareness: Uses GPS position and zone states
+ * - Structured output: Requests specific JSON schema
+ * - Adaptive gameplay: Missions change based on surroundings
+ * - Error handling: Provides fallback missions if AI fails
+ * 
+ * @param position - Player's current GPS coordinates
+ * @param nearbyZones - Array of zones within range (max 8 for context)
+ * @returns Promise<{missions: Mission[]}> - 2 adaptive missions
+ * 
+ * @example
+ * const missions = await generateMissions(
+ *   { lat: 37.7749, lng: -122.4194 },
+ *   [{ id: 'zone1', owner: null, coverRating: 'high' }]
+ * );
+ */
 export async function generateMissions(position: Position, nearbyZones: ZoneContext[]) {
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
@@ -59,6 +92,28 @@ Make missions that feel tactical and strategic. Use military/game terminology.`;
     return JSON.parse(jsonMatch[0]);
 }
 
+/**
+ * Generates real-time tactical commentary based on player movement
+ * 
+ * This function creates an AI companion that provides:
+ * - Strategic advice based on current position
+ * - Warnings about nearby threats
+ * - Tips for zone capture and defense
+ * - Immersive gameplay narration
+ * 
+ * @param position - Player's current GPS coordinates
+ * @param currentZone - Zone player is currently in (null if none)
+ * @param nearbyZones - Surrounding zones for context
+ * @returns Promise<{message: string, type: string}> - Commentary with severity type
+ * 
+ * @example
+ * const commentary = await generateCommentary(
+ *   { lat: 37.7749, lng: -122.4194 },
+ *   { id: 'zone1', owner: 'player', hp: 80 },
+ *   []
+ * );
+ * console.log(commentary.message); // "Zone HP at 80%. Reinforce soon."
+ */
 export async function generateCommentary(
     position: Position,
     currentZone: ZoneContext | null,
