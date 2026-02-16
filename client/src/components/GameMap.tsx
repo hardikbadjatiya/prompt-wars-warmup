@@ -31,6 +31,7 @@ export const GameMap: React.FC<GameMapProps> = React.memo(({
     const googleMapRef = useRef<google.maps.Map | null>(null);
     const playerMarkerRef = useRef<google.maps.Marker | null>(null);
     const zoneRectanglesRef = useRef<Map<string, google.maps.Rectangle>>(new Map());
+    const coverageBoundaryRef = useRef<google.maps.Rectangle | null>(null);
 
 
     // Initialize map
@@ -117,6 +118,61 @@ export const GameMap: React.FC<GameMapProps> = React.memo(({
         }
 
         googleMapRef.current.panTo(playerPos);
+    }, [playerPos]);
+
+    // Update coverage boundary
+    useEffect(() => {
+        if (!googleMapRef.current || !playerPos) {
+            // Remove boundary if no position
+            if (coverageBoundaryRef.current) {
+                coverageBoundaryRef.current.setMap(null);
+                coverageBoundaryRef.current = null;
+            }
+            return;
+        }
+
+        // Calculate boundary for 5-tile radius (default coverage area)
+        // Each tile is 100m, so 5 tiles = 500m radius
+        const TILE_SIZE_METERS = 100;
+        const RADIUS_TILES = 5;
+        const EARTH_RADIUS = 6371000;
+
+        const metersPerDegreeLat = (2 * Math.PI * EARTH_RADIUS) / 360;
+        const metersPerDegreeLng = metersPerDegreeLat * Math.cos((playerPos.lat * Math.PI) / 180);
+
+        const offsetMeters = TILE_SIZE_METERS * RADIUS_TILES;
+        const latOffset = offsetMeters / metersPerDegreeLat;
+        const lngOffset = offsetMeters / metersPerDegreeLng;
+
+        const bounds = {
+            north: playerPos.lat + latOffset,
+            south: playerPos.lat - latOffset,
+            east: playerPos.lng + lngOffset,
+            west: playerPos.lng - lngOffset,
+        };
+
+        if (!coverageBoundaryRef.current) {
+            // Create new boundary rectangle
+            coverageBoundaryRef.current = new google.maps.Rectangle({
+                map: googleMapRef.current,
+                bounds,
+                fillColor: 'transparent',
+                fillOpacity: 0,
+                strokeColor: '#00F5FF',
+                strokeOpacity: 0.6,
+                strokeWeight: 2,
+                strokePosition: google.maps.StrokePosition.OUTSIDE,
+                clickable: false,
+                zIndex: 5,
+            });
+
+            // Add dashed line pattern by creating multiple rectangles
+            // This creates a visual "dashed" effect
+            coverageBoundaryRef.current.set('strokeOpacity', 0.6);
+        } else {
+            // Update existing boundary
+            coverageBoundaryRef.current.setBounds(bounds);
+        }
     }, [playerPos]);
 
     // Render zones

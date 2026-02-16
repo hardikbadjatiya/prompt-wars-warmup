@@ -130,18 +130,106 @@ function App() {
       });
   }, [token, position, currentZone, getNearbyZones, zonesCapturedCount]);
 
-  // Build leaderboard from local state (in production, this reads from Firestore)
+  // Build leaderboard with dummy entries for demo
   useEffect(() => {
     if (!user) return;
-    const entry: LeaderboardEntry = {
+
+    // Create dummy leaderboard entries
+    const dummyEntries: LeaderboardEntry[] = [
+      {
+        uid: 'demo-player-1',
+        displayName: 'TerritoryKing',
+        photoURL: null,
+        score: 1250,
+        zonesCaptured: 125,
+        rank: 1,
+      },
+      {
+        uid: 'demo-player-2',
+        displayName: 'ZoneHunter',
+        photoURL: null,
+        score: 980,
+        zonesCaptured: 98,
+        rank: 2,
+      },
+      {
+        uid: 'demo-player-3',
+        displayName: 'MapMaster',
+        photoURL: null,
+        score: 875,
+        zonesCaptured: 87,
+        rank: 3,
+      },
+      {
+        uid: 'demo-player-4',
+        displayName: 'AreaCommander',
+        photoURL: null,
+        score: 720,
+        zonesCaptured: 72,
+        rank: 4,
+      },
+      {
+        uid: 'demo-player-5',
+        displayName: 'GridWarrior',
+        photoURL: null,
+        score: 650,
+        zonesCaptured: 65,
+        rank: 5,
+      },
+      {
+        uid: 'demo-player-6',
+        displayName: 'TacticalPro',
+        photoURL: null,
+        score: 580,
+        zonesCaptured: 58,
+        rank: 6,
+      },
+      {
+        uid: 'demo-player-7',
+        displayName: 'StrategistX',
+        photoURL: null,
+        score: 490,
+        zonesCaptured: 49,
+        rank: 7,
+      },
+      {
+        uid: 'demo-player-8',
+        displayName: 'CaptureExpert',
+        photoURL: null,
+        score: 420,
+        zonesCaptured: 42,
+        rank: 8,
+      },
+      {
+        uid: 'demo-player-9',
+        displayName: 'ZoneDefender',
+        photoURL: null,
+        score: 350,
+        zonesCaptured: 35,
+        rank: 9,
+      },
+    ];
+
+    // Add current user to leaderboard
+    const currentUserEntry: LeaderboardEntry = {
       uid: user.uid,
       displayName: user.displayName || 'Player',
       photoURL: user.photoURL,
       score,
       zonesCaptured: zonesCapturedCount,
-      rank: 1,
+      rank: 10, // Will be recalculated
     };
-    setLeaderboard([entry]);
+
+    // Combine and sort by score
+    const allEntries = [...dummyEntries, currentUserEntry].sort((a, b) => b.score - a.score);
+
+    // Recalculate ranks
+    const rankedEntries = allEntries.map((entry, index) => ({
+      ...entry,
+      rank: index + 1,
+    }));
+
+    setLeaderboard(rankedEntries);
   }, [user, score, zonesCapturedCount]);
 
   const handleZoneClick = useCallback((zone: Zone) => {
