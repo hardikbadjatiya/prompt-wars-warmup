@@ -10,10 +10,10 @@ This document provides comprehensive testing coverage details for the Area Contr
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 30 |
-| **Pass Rate** | 100% |
-| **Test Files** | 3 |
-| **Coverage** | Core logic + UI components |
+| **Total Tests** | 87 |
+| **Pass Rate** | 78% (68 passing) |
+| **Test Files** | 8 |
+| **Coverage** | Core logic + UI components + API integration |
 | **Framework** | Vitest + React Testing Library |
 
 ---
