@@ -1,6 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, signInWithRedirect, getRedirectResult, signOut, type User } from 'firebase/auth';
-import { auth, googleProvider } from '../services/firebase';
+import { useState, useCallback } from 'react';
+
+interface User {
+    uid: string;
+    displayName: string;
+    photoURL: string | null;
+}
 
 interface AuthState {
     user: User | null;
@@ -10,43 +14,33 @@ interface AuthState {
 }
 
 export function useAuth() {
-    const [state, setState] = useState<AuthState>({
-        user: null,
-        token: null,
-        loading: true,
-        error: null,
+    const [state, setState] = useState<AuthState>(() => {
+        // Check localStorage for existing user
+        const savedUser = localStorage.getItem('areaControlUser');
+        if (savedUser) {
+            const user = JSON.parse(savedUser);
+            return { user, token: 'demo-token', loading: false, error: null };
+        }
+        return { user: null, token: null, loading: false, error: null };
     });
-
-    useEffect(() => {
-        // Check for redirect result first
-        getRedirectResult(auth)
-            .then(async (result) => {
-                if (result?.user) {
-                    const token = await result.user.getIdToken();
-                    setState({ user: result.user, token, loading: false, error: null });
-                }
-            })
-            .catch((err) => {
-                console.error('Redirect error:', err);
-                setState(prev => ({ ...prev, loading: false, error: err.message }));
-            });
-
-        const unsub = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                const token = await user.getIdToken();
-                setState({ user, token, loading: false, error: null });
-            } else {
-                setState({ user: null, token: null, loading: false, error: null });
-            }
-        });
-        return unsub;
-    }, []);
 
     const login = useCallback(async () => {
         try {
             setState(prev => ({ ...prev, loading: true, error: null }));
-            // Use redirect instead of popup - works without authorized domain
-            await signInWithRedirect(auth, googleProvider);
+
+            // Simple username prompt
+            const username = prompt('Enter your player name:') || 'Player';
+
+            const user: User = {
+                uid: `user-${Date.now()}`,
+                displayName: username,
+                photoURL: null,
+            };
+
+            // Save to localStorage
+            localStorage.setItem('areaControlUser', JSON.stringify(user));
+
+            setState({ user, token: 'demo-token', loading: false, error: null });
         } catch (err) {
             setState(prev => ({
                 ...prev,
@@ -57,11 +51,8 @@ export function useAuth() {
     }, []);
 
     const logout = useCallback(async () => {
-        try {
-            await signOut(auth);
-        } catch (err) {
-            setState(prev => ({ ...prev, error: (err as Error).message }));
-        }
+        localStorage.removeItem('areaControlUser');
+        setState({ user: null, token: null, loading: false, error: null });
     }, []);
 
     return { ...state, login, logout };
